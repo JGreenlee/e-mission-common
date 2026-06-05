@@ -1,7 +1,7 @@
 {
   "name": "e-mission-common",
   "type": "module",
-  "version": "0.6.4",
+  "version": "0.6.6",
   "description": "A common library to share code between projects in the e-mission-platform. Written in Python and exposed as both Python and JavaScript.",
   "main": "./emcommon_js/index.js",
   "types": "./emcommon_js/dist/index.d.ts",
@@ -34,12 +34,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/JGreenlee/e-mission-common.git"
+    "url": "git+https://github.com/e-mission/e-mission-common.git"
   },
   "author": "Jack Greenlee",
   "license": "BSD-3-Clause",
   "bugs": {
     "url": "https://github.com/e-mission/e-mission-docs/issues"
   },
-  "homepage": "https://github.com/JGreenlee/e-mission-common#readme"
+  "homepage": "https://github.com/e-mission/e-mission-common#readme"
 }

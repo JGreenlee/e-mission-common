@@ -2,6 +2,10 @@ from __future__ import annotations  # __: skip
 import emcommon.logger as Log
 from emcommon.util import read_json_resource, fetch_url
 
+
+MIN_DATA_LOOKUP_YEAR = 2018
+MAX_DATA_LOOKUP_YEAR = 2022
+
 MI_PER_KM = 0.621371
 
 # 114,000 BTU / gal -> 33.41 kWh / gal
@@ -20,7 +24,7 @@ KWH_PER_GAL_BIODIESEL = KWH_PER_GGE * 1.05
 KWH_PER_GAL_LPG = KWH_PER_GGE * .74
 KWH_PER_GAL_CNG = KWH_PER_GGE * .26  # based on 3600 psi, industry standard
 KWH_PER_KG_HYDROGEN = KWH_PER_GGE * 1.00
-# TODO can we handle the default case better? https://github.com/JGreenlee/e-mission-common/pull/3#discussion_r1739188643
+# TODO can we handle the default case better? https://github.com/e-mission/e-mission-common/pull/3#discussion_r1739188643
 KWH_PER_GAL_OTHER = KWH_PER_GGE * 1.00
 
 # from CHEER paper 2024
@@ -76,28 +80,25 @@ def get_feature_containing_point(pt, geojson):
     return None
 
 
-latest_egrid_year = None
-latest_ntd_year = None
+def _clamp_year_for_lookup(year: int, dataset: str) -> int:
+    if year > MAX_DATA_LOOKUP_YEAR:
+        Log.warn(f"{dataset} year {year} exceeds max supported lookup year {MAX_DATA_LOOKUP_YEAR}. Using {MAX_DATA_LOOKUP_YEAR}.")
+        return MAX_DATA_LOOKUP_YEAR
+    if year < MIN_DATA_LOOKUP_YEAR:
+        Log.warn(f"{dataset} data not available for {year}. Using {MIN_DATA_LOOKUP_YEAR}.")
+        return MIN_DATA_LOOKUP_YEAR
+    return year
 
 
 async def get_egrid_region(coords: list[float, float], year: int) -> str | None:
     """
     Get the eGRID region at the given coordinates in the year.
     """
-    global latest_egrid_year
-    if year < 2018:
-        Log.warn(f"eGRID data not available for {year}. Using 2018.")
-        return await get_egrid_region(coords, 2018)
-    if latest_egrid_year is not None and year > latest_egrid_year:
-        return await get_egrid_region(coords, latest_egrid_year)
+    clamped_year = _clamp_year_for_lookup(year, 'eGRID')
     try:
-        geojson = await read_json_resource(f"egrid{year}_subregions_5pct.json")
+        geojson = await read_json_resource(f"egrid{clamped_year}_subregions_5pct.json")
     except:
-        if year > 2018:
-            Log.warn(f"eGRID data not available for {year}. Trying {year-1}.")
-            latest_egrid_year = year-1
-            return await get_egrid_region(coords, year-1)
-        Log.error(f"eGRID lookup failed for {year}.")
+        Log.error(f"eGRID lookup failed for {clamped_year}.")
         return None
     region_feature = get_feature_containing_point(coords, geojson)
     if region_feature is not None:
@@ -105,7 +106,7 @@ async def get_egrid_region(coords: list[float, float], year: int) -> str | None:
             return region_feature['properties']['name']
         if 'SUBRGN' in region_feature['properties']:
             return region_feature['properties']['SUBRGN']
-    Log.warn(f"An eGRID region was not found for coords {coords} in year {year}.")
+    Log.warn(f"An eGRID region was not found for coords {coords} in year {clamped_year}.")
     return None
 
 
@@ -142,25 +143,11 @@ async def get_intensities_data(year: int, dataset: str) -> dict:
     """
     Get the 'intensities' data for the given year from the specified dataset.
     """
-    global latest_egrid_year, latest_ntd_year
-    if year < 2018:
-        Log.warn(f"{dataset} data not available for {year}. Using 2018.")
-        return await get_intensities_data(2018, dataset)
-    if dataset == 'egrid' and latest_egrid_year is not None and year > latest_egrid_year:
-        return await get_intensities_data(latest_egrid_year, dataset)
-    if dataset == 'ntd' and latest_ntd_year is not None and year > latest_ntd_year:
-        return await get_intensities_data(latest_ntd_year, dataset)
+    clamped_year = _clamp_year_for_lookup(year, dataset)
     try:
-        return await read_json_resource(f"{dataset}{year}_intensities.json")
+        return await read_json_resource(f"{dataset}{clamped_year}_intensities.json")
     except:
-        if year > 2018:
-            Log.warn(f"{dataset} data not available for {year}. Trying {year-1}.")
-            if dataset == 'egrid':
-                latest_egrid_year = year-1
-            elif dataset == 'ntd':
-                latest_ntd_year = year-1
-            return await get_intensities_data(year-1, dataset)
-        Log.error(f"eGRID lookup failed for {year}.")
+        Log.error(f"{dataset} lookup failed for {clamped_year}.")
         return None
 
 
